@@ -1,0 +1,11 @@
+HOME = .
+openssl_conf = openssl_init
+
+[openssl_init]
+
+[req]
+distinguished_name = dn
+prompt = no
+
+[dn]
+CN = sso
