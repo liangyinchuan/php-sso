@@ -13,6 +13,7 @@ class User extends Model
     protected $hidden = ['password'];
     protected $dateFormat = 'Y-m-d H:i:s';
     protected $casts = [
+        'profile' => 'array',
         'is_admin' => 'boolean',
         'status' => 'integer',
     ];

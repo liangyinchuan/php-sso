@@ -7,6 +7,7 @@ namespace app\support;
 use app\model\AppUser;
 use app\model\Application;
 use app\model\EventLog;
+use app\model\ProfileField;
 use app\model\User;
 
 class Present
@@ -35,6 +36,43 @@ class Present
             'employee_no' => (string) ($profile['employee_no'] ?? ''),
             'extra' => $extra,
         ];
+    }
+
+    public static function field(ProfileField $field): array
+    {
+        return [
+            'id' => (int) $field->id,
+            'key' => (string) $field->field_key,
+            'label' => (string) $field->label,
+            'type' => (string) $field->field_type,
+            'required' => (bool) $field->required,
+            'options' => array_values($field->options ?: []),
+            'sort' => (int) $field->sort,
+            'builtin' => $field->isBuiltin(),
+        ];
+    }
+
+    public static function employee(mixed $profile, mixed $fields = null): array
+    {
+        $profile = is_array($profile) ? $profile : [];
+        $fields = $fields ?? ProfileField::active();
+        $result = [];
+        foreach ($fields as $field) {
+            $result[(string) $field->field_key] = (string) ($profile[$field->field_key] ?? '');
+        }
+        return $result;
+    }
+
+    public static function detail(User $user): array
+    {
+        $fields = ProfileField::active();
+        $data = self::user($user);
+        $data['profile'] = self::employee($user->profile, $fields);
+        $data['profile_fields'] = [];
+        foreach ($fields as $field) {
+            $data['profile_fields'][] = self::field($field);
+        }
+        return $data;
     }
 
     public static function user(User $user): array

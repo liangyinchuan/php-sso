@@ -12,6 +12,19 @@ export type User = {
   created_at: string | null
   apps_count?: number
   apps?: AppMembership[]
+  profile?: Record<string, string>
+  profile_fields?: ProfileField[]
+}
+
+export type ProfileField = {
+  id: number
+  key: string
+  label: string
+  type: 'text' | 'number' | 'date' | 'bool' | 'select' | 'file'
+  required: boolean
+  options: string[]
+  sort: number
+  builtin: boolean
 }
 
 export type AppItem = {
@@ -86,7 +99,7 @@ type Envelope<T> = { code: number; message: string; data: T }
 
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers)
-  if (init.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
+  if (init.body && !(init.body instanceof FormData) && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
   const response = await fetch(path, { ...init, headers, credentials: 'include' })
   const text = await response.text()
   let body: Envelope<T> | null = null
@@ -99,4 +112,19 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     throw new Error(body?.message || '请求失败')
   }
   return body?.data as T
+}
+
+export function profileFile(value: string): { id: string; name: string } | null {
+  const raw = value.trim()
+  if (!raw) return null
+  const split = raw.indexOf('|')
+  const id = split === -1 ? raw : raw.slice(0, split)
+  const name = split === -1 ? id : raw.slice(split + 1)
+  if (!/^[a-f0-9]{32}\.[a-z0-9]{2,5}$/.test(id)) return null
+  return { id, name: name || id }
+}
+
+export function isProfileImage(file: { id: string; name: string } | null): boolean {
+  if (!file) return false
+  return /\.(png|jpe?g|webp|gif)$/i.test(file.id)
 }

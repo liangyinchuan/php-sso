@@ -12,6 +12,7 @@ import Apps from './views/admin/Apps.vue'
 import AppEdit from './views/admin/AppEdit.vue'
 import Users from './views/admin/Users.vue'
 import UserEdit from './views/admin/UserEdit.vue'
+import Fields from './views/admin/Fields.vue'
 import Logs from './views/admin/Logs.vue'
 import Requests from './views/admin/Requests.vue'
 import Guide from './views/admin/Guide.vue'
@@ -37,6 +38,7 @@ const router = createRouter({
         { path: 'users', component: Users },
         { path: 'users/new', component: UserEdit },
         { path: 'users/:id', component: UserEdit },
+        { path: 'fields', component: Fields },
         { path: 'logs', component: Logs },
         { path: 'requests', component: Requests },
         { path: 'guide', component: Guide },

@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS users (
   password VARCHAR(255) NOT NULL,
   nickname VARCHAR(64) NOT NULL DEFAULT '',
   avatar VARCHAR(255) NOT NULL DEFAULT '',
+  profile JSON NULL,
   is_admin TINYINT NOT NULL DEFAULT 0,
   status TINYINT NOT NULL DEFAULT 1,
   last_login_at DATETIME DEFAULT NULL,
@@ -58,6 +59,22 @@ CREATE TABLE IF NOT EXISTS app_users (
   PRIMARY KEY (id),
   UNIQUE KEY uk_app_user (app_id, user_id),
   KEY idx_app_user_user (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS profile_fields (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  field_key VARCHAR(32) NOT NULL,
+  label VARCHAR(40) NOT NULL,
+  field_type VARCHAR(16) NOT NULL DEFAULT 'text',
+  required TINYINT NOT NULL DEFAULT 0,
+  options JSON NOT NULL,
+  sort INT NOT NULL DEFAULT 0,
+  builtin TINYINT NOT NULL DEFAULT 0,
+  status TINYINT NOT NULL DEFAULT 1,
+  created_at DATETIME DEFAULT NULL,
+  updated_at DATETIME DEFAULT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_profile_field_key (field_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS user_consents (

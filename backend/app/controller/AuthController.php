@@ -66,7 +66,7 @@ class AuthController
     public function me(Request $request): Response
     {
         $user = SessionService::user($request);
-        return ok(Present::user($user));
+        return ok(Present::detail($user));
     }
 
     public function profile(Request $request): Response
@@ -85,7 +85,7 @@ class AuthController
         $user->phone = $phone;
         $user->avatar = $avatar;
         $user->save();
-        return ok(Present::user($user), '资料已更新');
+        return ok(Present::detail($user), '资料已更新');
     }
 
     public function password(Request $request): Response

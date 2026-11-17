@@ -13,7 +13,7 @@
     <pre class="mt-3 overflow-auto rounded-2xl bg-navy p-4 text-sm leading-6 text-white">{{ browserSample }}</pre>
     <h2 class="mt-8 text-xl font-semibold">服务端用授权码换令牌</h2>
     <pre class="mt-3 overflow-auto rounded-2xl bg-navy p-4 text-sm leading-6 text-white">{{ tokenSample }}</pre>
-    <p class="mt-4 text-sm leading-6 text-ink-soft">userinfo 里的 <code>sub</code> 是身份中心的稳定用户编号，<code>app_uid</code> 是你在该应用里填写的外部编号。角色和部门只属于当前应用。本地 PHP 示例在 <code>examples/php-app</code>，管理台的「体验登录」演示 PKCE。</p>
+    <p class="mt-4 text-sm leading-6 text-ink-soft">userinfo 里的 <code>sub</code> 是身份中心的稳定用户编号，<code>app_uid</code> 是你在该应用里填写的外部编号。角色，以及应用成员上的部门、职位、工号只属于当前应用。员工档案在 <code>employee</code> 里，令牌带 profile 权限时返回。本地 PHP 示例在 <code>examples/php-app</code>，管理台的「体验登录」演示 PKCE。</p>
   </article>
 </template>
 

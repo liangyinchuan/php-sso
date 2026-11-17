@@ -112,6 +112,94 @@ $refresh = json_body(call_api($base . '/oauth/token', 'POST', http_build_query([
 ]), ['Content-Type: application/x-www-form-urlencoded']));
 echo "refresh expires={$refresh['expires_in']}\n";
 
+$fields = json_body(call_api($base . '/api/admin/fields'));
+$builtinId = 0;
+foreach ($fields['data'] ?? [] as $field) {
+    if (($field['key'] ?? '') === 'department' && !empty($field['builtin'])) {
+        $builtinId = (int) $field['id'];
+    }
+}
+if ($builtinId === 0) {
+    fwrite(STDERR, "缺少基础字段\n");
+    exit(1);
+}
+$denied = json_body(call_api($base . '/api/admin/fields/' . $builtinId, 'DELETE'));
+if (($denied['code'] ?? 0) === 0) {
+    fwrite(STDERR, "基础字段被删掉了\n");
+    exit(1);
+}
+echo "builtin delete blocked {$denied['message']}\n";
+$typed = json_body(call_api($base . '/api/admin/fields/' . $builtinId, 'PUT', json_encode([
+    'label' => '部门',
+    'type' => 'number',
+    'required' => false,
+    'sort' => 10,
+]), ['Content-Type: application/json']));
+if (($typed['code'] ?? 0) === 0) {
+    fwrite(STDERR, "基础字段类型被改掉了\n");
+    exit(1);
+}
+echo "builtin type blocked {$typed['message']}\n";
+$customKey = 's' . bin2hex(random_bytes(3));
+$custom = json_body(call_api($base . '/api/admin/fields', 'POST', json_encode([
+    'key' => $customKey,
+    'label' => '联调城市',
+    'type' => 'text',
+    'required' => false,
+    'sort' => 80,
+]), ['Content-Type: application/json']));
+if (($custom['code'] ?? 1) !== 0) {
+    fwrite(STDERR, '字段创建失败 ' . json_encode($custom, JSON_UNESCAPED_UNICODE) . "\n");
+    exit(1);
+}
+$removedField = json_body(call_api($base . '/api/admin/fields/' . $custom['data']['id'], 'DELETE'));
+if (($removedField['code'] ?? 1) !== 0) {
+    fwrite(STDERR, "自定义字段删除失败\n");
+    exit(1);
+}
+echo "field cleanup {$removedField['message']}\n";
+
+$uploadTmp = tempnam(sys_get_temp_dir(), 'sso');
+file_put_contents($uploadTmp, 'hello-file');
+$uploadCurl = curl_init($base . '/api/admin/files');
+curl_setopt_array($uploadCurl, [
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_POST => true,
+    CURLOPT_POSTFIELDS => ['file' => new CURLFile($uploadTmp, 'text/plain', 'note.txt')],
+    CURLOPT_COOKIEJAR => $cookie,
+    CURLOPT_COOKIEFILE => $cookie,
+]);
+$uploadRaw = curl_exec($uploadCurl);
+$uploadStatus = curl_getinfo($uploadCurl, CURLINFO_RESPONSE_CODE);
+curl_close($uploadCurl);
+@unlink($uploadTmp);
+$upload = json_decode((string) $uploadRaw, true);
+if ($uploadStatus !== 200 || ($upload['code'] ?? 1) !== 0 || !str_contains((string) ($upload['data']['value'] ?? ''), '|note.txt')) {
+    fwrite(STDERR, "上传失败 $uploadStatus $uploadRaw\n");
+    exit(1);
+}
+$fileValue = (string) $upload['data']['value'];
+$fileId = explode('|', $fileValue, 2)[0];
+echo "upload {$upload['data']['name']}\n";
+[$downStatus, , $downBody] = call_api($base . '/api/files/' . $fileId);
+if ($downStatus !== 200 || $downBody !== 'hello-file') {
+    fwrite(STDERR, "下载失败 $downStatus $downBody\n");
+    exit(1);
+}
+echo "download ok\n";
+$fileField = json_body(call_api($base . '/api/admin/fields', 'POST', json_encode([
+    'key' => 's' . bin2hex(random_bytes(3)),
+    'label' => '联调附件',
+    'type' => 'file',
+    'required' => false,
+    'sort' => 90,
+]), ['Content-Type: application/json']));
+if (($fileField['code'] ?? 1) !== 0) {
+    fwrite(STDERR, '文件字段创建失败 ' . json_encode($fileField, JSON_UNESCAPED_UNICODE) . "\n");
+    exit(1);
+}
+$fileFieldKey = (string) $fileField['data']['key'];
+
 $created = json_body(call_api($base . '/api/admin/users', 'POST', json_encode([
     'username' => 'smokeuser',
     'nickname' => '联调用户',
@@ -119,12 +207,24 @@ $created = json_body(call_api($base . '/api/admin/users', 'POST', json_encode([
     'email' => 'smoke@sso.local',
     'is_admin' => false,
     'status' => true,
+    'profile' => ['department' => '人事部', 'title' => '专员', 'employee_no' => 'HR1', $fileFieldKey => $fileValue],
 ]), ['Content-Type: application/json']));
 if (($created['code'] ?? 1) !== 0) {
     echo "create user skipped {$created['message']}\n";
 } else {
     echo "create user {$created['data']['id']}\n";
+    if (($created['data']['profile']['department'] ?? '') !== '人事部' || ($created['data']['profile'][$fileFieldKey] ?? '') !== $fileValue) {
+        fwrite(STDERR, "员工资料没有保存\n");
+        exit(1);
+    }
 }
+$removedFileField = json_body(call_api($base . '/api/admin/fields/' . $fileField['data']['id'], 'DELETE'));
+if (($removedFileField['code'] ?? 1) !== 0) {
+    fwrite(STDERR, "文件字段删除失败\n");
+    exit(1);
+}
+@unlink(dirname(__DIR__) . '/runtime/profile-files/' . $fileId);
+@unlink(dirname(__DIR__) . '/runtime/profile-files/' . $fileId . '.name');
 $apps = json_body(call_api($base . '/api/admin/apps?page_size=20'));
 if (!isset($apps['data']['list'])) {
     fwrite(STDERR, 'apps 接口异常 ' . json_encode($apps, JSON_UNESCAPED_UNICODE) . "\n");

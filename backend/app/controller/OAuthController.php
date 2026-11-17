@@ -39,7 +39,7 @@ class OAuthController
             'scopes_supported' => array_keys(config('sso.scopes')),
             'token_endpoint_auth_methods_supported' => ['client_secret_basic', 'client_secret_post', 'none'],
             'code_challenge_methods_supported' => ['S256'],
-            'claims_supported' => ['sub', 'name', 'preferred_username', 'email', 'phone_number', 'picture', 'roles', 'app_uid'],
+            'claims_supported' => ['sub', 'name', 'preferred_username', 'email', 'phone_number', 'picture', 'roles', 'app_uid', 'employee'],
         ]);
     }
 
@@ -188,6 +188,7 @@ class OAuthController
             $claims['department'] = $profile['department'];
             $claims['title'] = $profile['title'];
             $claims['employee_no'] = $profile['employee_no'];
+            $claims['employee'] = Present::employee($user->profile);
         }
         if (in_array('email', $scopes, true)) {
             $claims['email'] = (string) ($user->email ?? '');

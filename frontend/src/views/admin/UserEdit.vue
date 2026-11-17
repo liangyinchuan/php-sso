@@ -13,6 +13,39 @@
       <label class="flex items-center gap-2 text-sm"><input v-model="form.is_admin" type="checkbox" />管理员</label>
       <label class="flex items-center gap-2 text-sm"><input v-model="enabled" type="checkbox" />启用</label>
     </div>
+    <div class="mt-6 border-t border-line pt-5">
+      <div class="flex items-center justify-between gap-3">
+        <h2 class="font-semibold">员工资料</h2>
+        <router-link class="text-sm text-ink-soft" to="/admin/fields">管理字段</router-link>
+      </div>
+      <div class="mt-4 grid gap-4 sm:grid-cols-2">
+        <div v-for="field in fields" :key="field.key" class="text-sm" :class="field.type === 'file' ? 'sm:col-span-2' : ''">
+          {{ field.label }}<span v-if="field.required" class="text-copper"> *</span>
+          <input v-if="field.type === 'text'" v-model="profile[field.key]" class="field" />
+          <input v-else-if="field.type === 'number'" v-model="profile[field.key]" class="field" inputmode="decimal" />
+          <input v-else-if="field.type === 'date'" v-model="profile[field.key]" type="date" class="field" />
+          <select v-else-if="field.type === 'select'" v-model="profile[field.key]" class="field">
+            <option value="">请选择</option>
+            <option v-for="option in field.options" :key="option" :value="option">{{ option }}</option>
+          </select>
+          <span v-else-if="field.type === 'file'" class="mt-2 block">
+            <a v-if="storedFile(field.key) && isProfileImage(storedFile(field.key))" class="mb-2 block w-fit" :href="'/api/files/' + storedFile(field.key)?.id" target="_blank">
+              <img :src="'/api/files/' + storedFile(field.key)?.id" :alt="storedFile(field.key)?.name" class="max-h-40 rounded-xl border border-line bg-white object-contain" />
+            </a>
+            <a v-if="storedFile(field.key)" class="text-copper" :href="'/api/files/' + storedFile(field.key)?.id" target="_blank">{{ storedFile(field.key)?.name }}</a>
+            <span v-else class="text-ink-soft">未上传</span>
+            <span class="mt-2 flex flex-wrap items-center gap-2">
+              <input type="file" class="max-w-full text-xs" accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.txt,.csv,.doc,.docx,.xls,.xlsx,.zip" @change="uploadFile(field.key, $event)" />
+              <button v-if="profile[field.key]" type="button" class="rounded-lg border border-line px-2 py-1 text-xs" @click="profile[field.key] = ''">清除</button>
+            </span>
+            <span class="mt-1 block text-xs text-ink-soft">pdf、图片、Word、Excel、zip，不超过 8MB</span>
+          </span>
+          <span v-else class="mt-2 flex items-center gap-2">
+            <input type="checkbox" :checked="profile[field.key] === '1'" @change="setFlag(field.key, $event)" />是
+          </span>
+        </div>
+      </div>
+    </div>
     <div class="mt-5 flex gap-3">
       <button class="rounded-xl bg-copper px-4 py-2 text-white">保存</button>
       <button v-if="id" type="button" class="rounded-xl border border-line px-4 py-2 text-copper" @click="remove">删除</button>
@@ -35,7 +68,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { api, type AppMembership, type User } from '../../api'
+import { api, isProfileImage, profileFile, type AppMembership, type ProfileField, type User } from '../../api'
 import { notify } from '../../toast'
 
 const route = useRoute()
@@ -45,18 +78,51 @@ const enabled = ref(true)
 const nextPassword = ref('')
 const apps = ref<AppMembership[]>([])
 const form = reactive({ username: '', nickname: '', email: '', phone: '', password: '', is_admin: false })
+const fields = ref<ProfileField[]>([])
+const profile = reactive<Record<string, string>>({})
+
+function applyFields(items: ProfileField[], values: Record<string, string> = {}) {
+  fields.value = items
+  for (const field of items) {
+    profile[field.key] = values[field.key] ?? (field.type === 'bool' ? '0' : '')
+  }
+}
+function setFlag(key: string, event: Event) {
+  profile[key] = (event.target as HTMLInputElement).checked ? '1' : '0'
+}
+function storedFile(key: string) {
+  return profileFile(profile[key] || '')
+}
+async function uploadFile(key: string, event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  const body = new FormData()
+  body.append('file', file)
+  try {
+    const saved = await api<{ value: string }>('/api/admin/files', { method: 'POST', body })
+    profile[key] = saved.value
+    notify('文件已上传，保存用户后生效')
+  } catch (e) { notify(e instanceof Error ? e.message : '上传失败', 'err') }
+  input.value = ''
+}
 
 onMounted(async () => {
-  if (!id) return
+  const items = await api<ProfileField[]>('/api/admin/fields')
+  if (!id) {
+    applyFields(items)
+    return
+  }
   const user = await api<User>('/api/admin/users/' + id)
   Object.assign(form, user)
   enabled.value = user.status === 1
   apps.value = user.apps || []
+  applyFields(items, user.profile || {})
 })
 
 async function save() {
   try {
-    const body = { ...form, status: enabled.value }
+    const body = { ...form, status: enabled.value, profile: { ...profile } }
     const user = await api<User>(id ? '/api/admin/users/' + id : '/api/admin/users', { method: id ? 'PUT' : 'POST', body: JSON.stringify(body) })
     notify('已保存')
     if (!id) router.replace('/admin/users/' + user.id)

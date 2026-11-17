@@ -1,9 +1,11 @@
 <?php
 
 use app\controller\AccountController;
+use app\controller\FileController;
 use app\controller\admin\ApplicationController;
 use app\controller\admin\DashboardController;
 use app\controller\admin\LogController;
+use app\controller\admin\ProfileFieldController;
 use app\controller\admin\RequestController;
 use app\controller\admin\UserController;
 use app\controller\AuthController;
@@ -17,6 +19,7 @@ use Webman\Route;
 
 Route::disableDefaultRoute();
 
+Route::get('/api/files/{id}', [FileController::class, 'download'])->middleware([AuthMiddleware::class]);
 Route::get('/api/health', [PublicController::class, 'health']);
 Route::get('/api/public/demo', [PublicController::class, 'demo']);
 
@@ -49,6 +52,11 @@ Route::group('/api/admin', function () {
     Route::post('/apps/{id}/users', [ApplicationController::class, 'addUser']);
     Route::put('/apps/{id}/users/{userId}', [ApplicationController::class, 'updateUser']);
     Route::delete('/apps/{id}/users/{userId}', [ApplicationController::class, 'removeUser']);
+    Route::post('/files', [FileController::class, 'upload']);
+    Route::get('/fields', [ProfileFieldController::class, 'index']);
+    Route::post('/fields', [ProfileFieldController::class, 'store']);
+    Route::put('/fields/{id}', [ProfileFieldController::class, 'update']);
+    Route::delete('/fields/{id}', [ProfileFieldController::class, 'destroy']);
     Route::get('/users', [UserController::class, 'index']);
     Route::post('/users', [UserController::class, 'store']);
     Route::get('/users/{id}', [UserController::class, 'show']);

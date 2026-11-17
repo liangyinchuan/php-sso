@@ -13,6 +13,22 @@
         <label class="mt-5 block text-sm">昵称<input v-model="form.nickname" class="field" /></label>
         <label class="mt-4 block text-sm">邮箱<input v-model="form.email" class="field" /></label>
         <label class="mt-4 block text-sm">手机<input v-model="form.phone" class="field" /></label>
+        <div v-if="employeeFields.length" class="mt-6 border-t border-line pt-4">
+          <h2 class="text-sm font-medium">员工资料</h2>
+          <p class="mt-1 text-xs text-ink-soft">由管理员维护。</p>
+          <dl class="mt-3 grid gap-2 text-sm">
+            <div v-for="field in employeeFields" :key="field.key" class="flex justify-between gap-4">
+              <dt class="text-ink-soft">{{ field.label }}</dt>
+              <dd v-if="field.type === 'file' && profileFile(employee[field.key] || '')" class="text-right">
+                <a v-if="isProfileImage(profileFile(employee[field.key] || ''))" class="mb-1 block" :href="'/api/files/' + profileFile(employee[field.key] || '')?.id" target="_blank">
+                  <img :src="'/api/files/' + profileFile(employee[field.key] || '')?.id" :alt="profileFile(employee[field.key] || '')?.name" class="ml-auto max-h-28 rounded-lg border border-line bg-white object-contain" />
+                </a>
+                <a class="text-copper" :href="'/api/files/' + profileFile(employee[field.key] || '')?.id" target="_blank">{{ profileFile(employee[field.key] || '')?.name }}</a>
+              </dd>
+              <dd v-else>{{ showEmployee(field) }}</dd>
+            </div>
+          </dl>
+        </div>
         <button class="mt-5 rounded-xl bg-copper px-4 py-2 text-white">保存资料</button>
       </form>
       <form class="rounded-3xl border border-line bg-card p-6" @submit.prevent="savePassword">
@@ -59,7 +75,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import Brand from '../components/Brand.vue'
-import { api } from '../api'
+import { api, isProfileImage, profileFile, type ProfileField, type User } from '../api'
 import { useAuth } from '../stores/auth'
 import { notify } from '../toast'
 
@@ -79,23 +95,37 @@ const auth = useAuth()
 const router = useRouter()
 const catalog = ref<CatalogApp[]>([])
 const form = reactive({ nickname: '', email: '', phone: '' })
+const employeeFields = ref<ProfileField[]>([])
+const employee = ref<Record<string, string>>({})
+
+function showEmployee(field: ProfileField) {
+  const value = employee.value[field.key] || ''
+  if (field.type === 'bool') return value === '1' ? '是' : '否'
+  return value || '—'
+}
+function takeEmployee(user: User) {
+  employeeFields.value = user.profile_fields || []
+  employee.value = user.profile || {}
+}
 const oldPassword = ref('')
 const password = ref('')
 const applyId = ref(0)
 const reason = ref('')
 
 onMounted(async () => {
-  if (auth.user) {
-    form.nickname = auth.user.nickname
-    form.email = auth.user.email
-    form.phone = auth.user.phone
-  }
+  const me = await api<User>('/api/auth/me')
+  auth.user = me
+  form.nickname = me.nickname
+  form.email = me.email
+  form.phone = me.phone
+  takeEmployee(me)
   catalog.value = await api<CatalogApp[]>('/api/account/catalog')
 })
 
 async function saveProfile() {
   try {
-    auth.user = await api('/api/auth/profile', { method: 'PUT', body: JSON.stringify(form) })
+    auth.user = await api<User>('/api/auth/profile', { method: 'PUT', body: JSON.stringify(form) })
+    takeEmployee(auth.user)
     notify('资料已保存')
   } catch (e) { notify(e instanceof Error ? e.message : '保存失败', 'err') }
 }

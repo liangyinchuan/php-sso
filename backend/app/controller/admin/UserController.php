@@ -9,10 +9,12 @@ use app\model\AccessRequest;
 use app\model\Application;
 use app\model\AppUser;
 use app\model\RefreshToken;
+use app\model\ProfileField;
 use app\model\User;
 use app\model\UserConsent;
 use app\service\Audit;
 use app\service\SessionService;
+use app\support\EmployeeProfile;
 use app\support\Input;
 use app\support\Present;
 use app\support\Rules;
@@ -72,6 +74,7 @@ class UserController
                 'status' => (int) $member->status,
             ];
         }
+        $data['profile'] = Present::employee($user->profile);
         return ok($data);
     }
 
@@ -94,10 +97,11 @@ class UserController
             'avatar' => Rules::optionalUrl(Input::str($request, 'avatar'), '头像地址'),
             'is_admin' => Input::bool($request, 'is_admin') ? 1 : 0,
             'status' => Input::bool($request, 'status', true) ? 1 : 0,
+            'profile' => EmployeeProfile::values($this->profileInput($request) ?? [], ProfileField::active()),
         ]);
         $actor = SessionService::user($request);
         Audit::write($request, 'user_create', true, $username, $actor ? (int) $actor->id : null, null, $actor->username ?? '');
-        return ok(Present::user($user), '用户已创建');
+        return ok($this->payload($user), '用户已创建');
     }
 
     public function update(Request $request, string $id): Response
@@ -122,11 +126,16 @@ class UserController
         $user->avatar = Rules::optionalUrl(Input::str($request, 'avatar'), '头像地址');
         $user->is_admin = $isAdmin ? 1 : 0;
         $user->status = $status ? 1 : 0;
+        $profile = $this->profileInput($request);
+        if ($profile !== null) {
+            $existing = is_array($user->profile) ? $user->profile : [];
+            $user->profile = EmployeeProfile::values($profile, ProfileField::active(), $existing);
+        }
         $user->save();
         if (!$status) {
             RefreshToken::where('user_id', $user->id)->whereNull('revoked_at')->update(['revoked_at' => date('Y-m-d H:i:s')]);
         }
-        return ok(Present::user($user), '用户已保存');
+        return ok($this->payload($user), '用户已保存');
     }
 
     public function resetPassword(Request $request, string $id): Response
@@ -153,6 +162,25 @@ class UserController
             $user->delete();
         });
         return ok(null, '用户已删除');
+    }
+
+    private function payload(User $user): array
+    {
+        $data = Present::user($user);
+        $data['profile'] = Present::employee($user->profile);
+        return $data;
+    }
+
+    private function profileInput(Request $request): ?array
+    {
+        $post = (array) $request->post();
+        if (!array_key_exists('profile', $post)) {
+            return null;
+        }
+        if (!is_array($post['profile'])) {
+            throw new ApiException('员工资料格式不正确');
+        }
+        return $post['profile'];
     }
 
     private function find(string $id): User

@@ -57,6 +57,7 @@ if (!is_file($privateFile) || !is_file($publicFile)) {
 }
 
 $now = date('Y-m-d H:i:s');
+ensureEmployeeProfile($pdo, $now);
 $adminId = (int) $pdo->query("SELECT id FROM users WHERE username='admin'")->fetchColumn();
 if ($adminId === 0) {
     $stmt = $pdo->prepare('INSERT INTO users (username, email, password, nickname, is_admin, status, created_at, updated_at) VALUES (?, ?, ?, ?, 1, 1, ?, ?)');
@@ -112,6 +113,29 @@ seedApp($pdo, [
 ], $scopes, $roles, $profile, $demoUserId, $now);
 
 echo "数据库 {$database} 已就绪\n";
+
+function ensureEmployeeProfile(PDO $pdo, string $now): void
+{
+    $column = $pdo->query("SHOW COLUMNS FROM users LIKE 'profile'")->fetch();
+    if (!$column) {
+        $pdo->exec('ALTER TABLE users ADD COLUMN profile JSON NULL AFTER avatar');
+        echo "已添加用户员工资料列\n";
+    }
+    $builtins = [
+        ['department', '部门', 10],
+        ['title', '职位', 20],
+        ['employee_no', '工号', 30],
+    ];
+    $find = $pdo->prepare('SELECT id FROM profile_fields WHERE field_key = ?');
+    $insert = $pdo->prepare('INSERT INTO profile_fields (field_key, label, field_type, required, options, sort, builtin, status, created_at, updated_at) VALUES (?, ?, \'text\', 0, \'[]\', ?, 1, 1, ?, ?)');
+    foreach ($builtins as [$key, $label, $sort]) {
+        $find->execute([$key]);
+        if ((int) $find->fetchColumn() === 0) {
+            $insert->execute([$key, $label, $sort, $now, $now]);
+            echo "已添加基础字段 {$label}\n";
+        }
+    }
+}
 
 function seedApp(PDO $pdo, array $meta, string $scopes, string $roles, string $profile, int $userId, string $now): void
 {

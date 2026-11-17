@@ -30,6 +30,7 @@ const items = [
   { to: '/admin', label: '概览', exact: true },
   { to: '/admin/apps', label: '接入应用', exact: false },
   { to: '/admin/users', label: '用户', exact: false },
+  { to: '/admin/fields', label: '员工字段', exact: false },
   { to: '/admin/requests', label: '权限申请', exact: false },
   { to: '/admin/logs', label: '日志', exact: false },
   { to: '/admin/guide', label: '接入说明', exact: false },
